@@ -51,8 +51,8 @@ typedef struct XPSNRDSPContext
 {
   uint64_t (*sse_line) (const uint8_t *buf, const uint8_t *ref, int w);
 }
-XPSNRDSPContext;
+PSNRDSPContext;
 
-void ff_xpsnr_init_x86 (XPSNRDSPContext *dsp, int bpp);
+void ff_psnr_init_x86 (PSNRDSPContext *dsp, int bpp);
 
 #endif /* AVFILTER_XPSNR_H */

@@ -78,14 +78,16 @@ typedef struct XPSNRContext
   /* XPSNR specific variables */
   double          *sseLuma;
   double          *weights;
-  AVBufferRef*    bufOrgM1[4];
-  AVBufferRef*    bufOrgM2[4];
+  AVBufferRef*    bufOrg  [3];
+  AVBufferRef*    bufOrgM1[3];
+  AVBufferRef*    bufOrgM2[3];
+  AVBufferRef*    bufRec  [3];
   uint64_t        maxError64;
   double          sumWDist[3];
   double          sumXPSNR[3];
   bool            andIsInf[3];
   bool            isRGB;
-//  XPSNRDSPContext dsp;
+  PSNRDSPContext  dsp;
 }
 XPSNRContext;
 
@@ -109,7 +111,25 @@ FRAMESYNC_DEFINE_CLASS (xpsnr, XPSNRContext, fs);
 
 /* XPSNR function definitions */
 
-static inline uint64_t calcSquaredError(const int16_t *blkOrg,     const uint32_t strideOrg,
+static uint64_t sseLine16bit (const uint8_t *blkOrg8, const uint8_t *blkRec8, int blockWidth)
+{
+  const uint16_t *blkOrg = (const uint16_t*) blkOrg8;
+  const uint16_t *blkRec = (const uint16_t*) blkRec8;
+  uint64_t lSSE = 0; /* data for 1 pixel line */
+
+  for (int x = 0; x < blockWidth; x++)
+  {
+    const int64_t error = (int64_t) blkOrg[x] - (int64_t) blkRec[x];
+
+    lSSE += error * error;
+  }
+
+  /* sum of squared errors for the pixel line */
+  return lSSE;
+}
+
+static inline uint64_t calcSquaredError(XPSNRContext const *s,
+                                        const int16_t *blkOrg,     const uint32_t strideOrg,
                                         const int16_t *blkRec,     const uint32_t strideRec,
                                         const uint32_t blockWidth, const uint32_t blockHeight)
 {
@@ -117,12 +137,7 @@ static inline uint64_t calcSquaredError(const int16_t *blkOrg,     const uint32_
 
   for (uint32_t y = 0; y < blockHeight; y++)
   {
-    for (uint32_t x = 0; x < blockWidth; x++)
-    {
-      const int64_t iDiff = (int64_t) blkOrg[x] - (int64_t) blkRec[x];
-
-      uSSE += (uint64_t)(iDiff * iDiff);
-    }
+    uSSE += s->dsp.sse_line ((const uint8_t*) blkOrg, (const uint8_t*) blkRec, (int) blockWidth);
     blkOrg += strideOrg;
     blkRec += strideRec;
   }
@@ -131,10 +146,10 @@ static inline uint64_t calcSquaredError(const int16_t *blkOrg,     const uint32_
   return uSSE;
 }
 
-static inline double calcSquaredErrorAndWeight (const int16_t *picOrg,     const uint32_t strideOrg,
+static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
+                                                const int16_t *picOrg,     const uint32_t strideOrg,
                                                 int16_t       *picOrgM1,   int16_t       *picOrgM2,
                                                 const int16_t *picRec,     const uint32_t strideRec,
-                                                const uint32_t imageWidth, const uint32_t imageHeight,
                                                 const uint32_t offsetX,    const uint32_t offsetY,
                                                 const uint32_t blockWidth, const uint32_t blockHeight,
                                                 const uint32_t bitDepth,   const uint32_t intFrameRate, double *msAct)
@@ -145,13 +160,13 @@ static inline double calcSquaredErrorAndWeight (const int16_t *picOrg,     const
   int16_t     *oM1 = picOrgM1 + offsetY*O + offsetX;
   int16_t     *oM2 = picOrgM2 + offsetY*O + offsetX;
   const int16_t *r = picRec   + offsetY*R + offsetX;
-  const int   bVal = (imageWidth * imageHeight > 2048u * 1152u ? 2 : 1); /* threshold is a bit more than HD resolution */
+  const int   bVal = (s->planeWidth[0] * s->planeHeight[0] > 2048 * 1152 ? 2 : 1); /* threshold is a bit more than HD resolution */
   const int   xAct = (offsetX > 0 ? 0 : bVal);
   const int   yAct = (offsetY > 0 ? 0 : bVal);
-  const int   wAct = (offsetX + blockWidth  < imageWidth  ? (int) blockWidth  : (int) blockWidth  - bVal);
-  const int   hAct = (offsetY + blockHeight < imageHeight ? (int) blockHeight : (int) blockHeight - bVal);
+  const int   wAct = (offsetX + blockWidth  < (uint32_t) s->planeWidth [0] ? (int) blockWidth  : (int) blockWidth  - bVal);
+  const int   hAct = (offsetY + blockHeight < (uint32_t) s->planeHeight[0] ? (int) blockHeight : (int) blockHeight - bVal);
 
-  const double sse = (double) calcSquaredError (o, strideOrg,
+  const double sse = (double) calcSquaredError (s, o, strideOrg,
                                                 r, strideRec,
                                                 blockWidth, blockHeight);
   uint64_t saAct = 0;  /* spatial abs. activity */
@@ -290,8 +305,7 @@ static inline double getAvgXPSNR (const double sqrtWSSEData, const double sumXPS
   return sumXPSNRData / (double) numFrames64; /* older log-domain averaging */
 }
 
-static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_t **orgM2,
-                    int16_t **rec, uint64_t* const wsse64, const uint32_t bitDepth, const uint32_t intFrameRate)
+static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_t **orgM2, int16_t **rec, uint64_t* const wsse64)
 {
   XPSNRContext* const s = ctx->priv;
   const uint32_t      W = s->planeWidth [0];  /* luma image width in pixels */
@@ -299,13 +313,13 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
   const double        R = (double)(W * H) / (3840.0 * 2160.0); /* UHD ratio */
   const uint32_t      B = MAX (0, 4 * (int32_t)(32.0 * sqrt (R) + 0.5)); /* block size, integer multiple of 4 for SIMD */
   const uint32_t   WBlk = (W + B - 1) / B; /* luma width in units of blocks */
-  const double   avgAct = sqrt (16.0 * (double)(1 << (2 * bitDepth - 9)) / sqrt (MAX (0.00001, R))); /* = sqrt (a_pic) */
+  const double   avgAct = sqrt (16.0 * (double)(1 << (2 * s->depth - 9)) / sqrt (MAX (0.00001, R))); /* = sqrt (a_pic) */
   uint32_t x, y, idxBlk = 0; /* the "16.0" above is due to fixed-point code */
   double* const sseLuma = s->sseLuma;
   double* const weights = s->weights;
   int c;
 
-  if ((wsse64 == NULL) || (bitDepth < 6) || (s->numComps <= 0) || (s->numComps > 3) || (W == 0) || (H == 0))
+  if ((wsse64 == NULL) || (s->depth < 6) || (s->depth > 16) || (s->numComps <= 0) || (s->numComps > 3) || (W == 0) || (H == 0))
   {
     av_log (ctx, AV_LOG_ERROR, "Error in XPSNR routine: invalid argument(s).\n");
 
@@ -339,13 +353,12 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
         const uint32_t blockWidth = (x + B > W ? W - x : B);
         double msAct = 0.0, msActPrev = 0.0;
 
-        sseLuma[idxBlk] = calcSquaredErrorAndWeight(pOrg, sOrg,
+        sseLuma[idxBlk] = calcSquaredErrorAndWeight(s, pOrg, sOrg,
                                                     pOrgM1, pOrgM2,
                                                     pRec, sRec,
-                                                    W, H,
                                                     x, y,
                                                     blockWidth, blockHeight,
-                                                    bitDepth, intFrameRate, &msAct);
+                                                    s->depth, s->frameRate, &msAct);
         weights[idxBlk] = 1.0 / sqrt (msAct);
 
         if (blockWeightSmoothing) /* inline "minimum-smoothing" as in paper */
@@ -399,7 +412,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
 
     if (B < 4) /* picture is too small for XPSNR, calculate unweighted PSNR */
     {
-      wsse64[c] = calcSquaredError (pOrg, sOrg,
+      wsse64[c] = calcSquaredError (s, pOrg, sOrg,
                                     pRec, sRec,
                                     WPln, HPln);
     }
@@ -417,7 +430,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
         {
           const uint32_t blockWidth = (x + Bx > WPln ? WPln - x : Bx);
 
-          wsseChroma += (double) calcSquaredError(pOrg + y*sOrg + x, sOrg,
+          wsseChroma += (double) calcSquaredError(s, pOrg + y*sOrg + x, sOrg,
                                                   pRec + y*sRec + x, sRec,
                                                   blockWidth, blockHeight) * weights[idxBlk];
         }
@@ -467,12 +480,15 @@ static int do_xpsnr (FFFrameSync *fs)
 
   if (s->bpp == 1) /* 8 bit */
   {
-    for (c = 0; c < (s->numComps > 3 ? 3 : s->numComps); c++)
+    for (c = 0; c < s->numComps; c++) /* allocate the org/rec buffer memory */
     {
       const int O = s->planeWidth[c]; /* stride */
 
-      pOrg[c] = (int16_t *) av_mallocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
-      pRec[c] = (int16_t *) av_mallocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
+      if (s->bufOrg[c] == NULL) s->bufOrg[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
+      if (s->bufRec[c] == NULL) s->bufRec[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
+
+      pOrg[c] = (int16_t*) s->bufOrg[c]->data;
+      pRec[c] = (int16_t*) s->bufRec[c]->data;
 
       for (int y = 0; y < s->planeHeight[c]; y++)
       {
@@ -484,9 +500,9 @@ static int do_xpsnr (FFFrameSync *fs)
       }
     }
   }
-  else /* 10, 12, or 16 bit */
+  else /* 10, 12, or 14 bit */
   {
-    for (c = 0; c < (s->numComps > 3 ? 3 : s->numComps); c++)
+    for (c = 0; c < s->numComps; c++)
     {
       pOrg[c] = (int16_t*) master->data[c];
       pRec[c] = (int16_t*)    ref->data[c];
@@ -495,7 +511,7 @@ static int do_xpsnr (FFFrameSync *fs)
 
   /* extended perceptually weighted peak signal-to-noise ratio (XPSNR) data */
 
-  if ((retValue = getWSSE (ctx, (int16_t **)&pOrg, (int16_t **)&pOrgM1, (int16_t **)&pOrgM2, (int16_t **)&pRec, wsse64, s->depth, s->frameRate)) < 0)
+  if ((retValue = getWSSE (ctx, (int16_t **)&pOrg, (int16_t **)&pOrgM1, (int16_t **)&pOrgM2, (int16_t **)&pRec, wsse64)) < 0)
   {
     return retValue; /* an error here implies something went wrong earlier! */
   }
@@ -522,15 +538,6 @@ static int do_xpsnr (FFFrameSync *fs)
       fprintf (s->statsFile, "  XPSNR %c: %3.4f", s->comps[c], curXPSNR[c]);
     }
     fprintf (s->statsFile, "\n");
-  }
-
-  if (s->bpp == 1) /* 8 bit */
-  {
-    for (c = 0; c < s->numComps; c++) /* free org/ref picture buffer memory */
-    {
-      if (&pOrg[c] != NULL) av_freep (&pOrg[c]);
-      if (&pRec[c] != NULL) av_freep (&pRec[c]);
-    }
   }
 
   return ff_filter_frame (ctx->outputs[0], master);
@@ -566,13 +573,13 @@ static av_cold int init (AVFilterContext *ctx)
 
   s->sseLuma = NULL;
   s->weights = NULL;
-  s->bufOrgM1[3] = NULL;
-  s->bufOrgM2[3] = NULL;
 
   for (c = 0; c < 3; c++) /* initialize XPSNR data of every color component */
   {
+    s->bufOrg  [c] = NULL;
     s->bufOrgM1[c] = NULL;
     s->bufOrgM2[c] = NULL;
+    s->bufRec  [c] = NULL;
     s->sumWDist[c] = 0.0;
     s->sumXPSNR[c] = 0.0;
     s->andIsInf[c] = true;
@@ -640,7 +647,7 @@ static int config_input_ref (AVFilterLink *inLink)
 
   s->frameRate = inLink->frame_rate.num / inLink->frame_rate.den;
 
-  s->numComps = desc->nb_components;
+  s->numComps = (desc->nb_components > 3 ? 3 : desc->nb_components);
 
   s->isRGB = (ff_fill_rgba_map (s->rgbaMap, inLink->format) >= 0);
   s->comps[0] = (s->isRGB ? 'R' : 'Y');
@@ -652,6 +659,9 @@ static int config_input_ref (AVFilterLink *inLink)
   s->planeWidth [0] = s->planeWidth [3] = inLink->w;
   s->planeHeight[1] = s->planeHeight[2] = AV_CEIL_RSHIFT (inLink->h, desc->log2_chroma_h);
   s->planeHeight[0] = s->planeHeight[3] = inLink->h;
+
+  s->dsp.sse_line = sseLine16bit; /* initialize SIMD routine */
+  if (ARCH_X86) ff_psnr_init_x86 (&s->dsp, 15); /* from PSNR */
 
   return 0;
 }
@@ -693,6 +703,8 @@ static av_cold void uninit (AVFilterContext *ctx)
     const double xpsnrLuma = getAvgXPSNR (s->sumWDist[0], s->sumXPSNR[0],
                                           s->planeWidth[0], s->planeHeight[0],
                                           s->maxError64, s->numFrames64);
+    double xpsnrMin = xpsnrLuma;
+
     /* luma */
     av_log (ctx, AV_LOG_INFO, "XPSNR  %c: %3.4f", s->comps[0], xpsnrLuma);
     if (s->statsFile != NULL)
@@ -706,15 +718,25 @@ static av_cold void uninit (AVFilterContext *ctx)
       const double xpsnrChroma = getAvgXPSNR (s->sumWDist[c], s->sumXPSNR[c],
                                               s->planeWidth[c], s->planeHeight[c],
                                               s->maxError64, s->numFrames64);
+      if (xpsnrMin > xpsnrChroma) xpsnrMin = xpsnrChroma;
+
       av_log (ctx, AV_LOG_INFO, "  %c: %3.4f", s->comps[c], xpsnrChroma);
       if (s->statsFile != NULL)
       {
         fprintf (s->statsFile, "  %c: %3.4f", s->comps[c], xpsnrChroma);
       }
     }
-    /* line break */
-    av_log (ctx, AV_LOG_INFO, "\n");
-    if (s->statsFile != NULL) fprintf (s->statsFile, "\n");
+    /* print out line break (and minimum XPSNR across the color components) */
+    if (s->numComps > 1)
+    {
+      av_log (ctx, AV_LOG_INFO, "  (minimum: %3.4f)\n", xpsnrMin);
+      if (s->statsFile != NULL) fprintf (s->statsFile, "  (minimum: %3.4f)\n", xpsnrMin);
+    }
+    else
+    {
+      av_log (ctx, AV_LOG_INFO, "\n");
+      if (s->statsFile != NULL) fprintf (s->statsFile, "\n");
+    }
   }
 
   ff_framesync_uninit (&s->fs);  /* free temporary picture and block memory */
@@ -726,6 +748,14 @@ static av_cold void uninit (AVFilterContext *ctx)
   {
     if (s->bufOrgM1[c] != NULL) av_freep (&s->bufOrgM1[c]);
     if (s->bufOrgM2[c] != NULL) av_freep (&s->bufOrgM2[c]);
+  }
+  if (s->bpp == 1) /* 8 bit */
+  {
+    for (c = 0; c < s->numComps; c++) /* free org/rec picture buffer memory */
+    {
+      if (&s->bufOrg[c] != NULL) av_freep (&s->bufOrg[c]);
+      if (&s->bufRec[c] != NULL) av_freep (&s->bufRec[c]);
+    }
   }
 }
 

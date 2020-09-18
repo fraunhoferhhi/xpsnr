@@ -107,7 +107,8 @@ of this source distribution into FFmpeg's `libavfilter` directory:
 `cp xpsnr/libavfilter/* ffmpeg/libavfilter/`
 
 Note that the `allfilters.c` and `Makefile` files already exist in
-the FFmpeg source distribution and will be replaced. The `xpsnr.h`
+the FFmpeg source distribution and will be replaced (XPSNR related
+lines have been added in each of these source files). The `xpsnr.h`
 and `vf_xpsnr.c` files will be added to the FFmpeg distribution.
 
 Now, you can configure and compile FFmpeg to generate the `ffmpeg`
@@ -195,7 +196,7 @@ The following functionality is planned to be integrated in a future
 revision of this XPSNR implementation. Support is kindly requested.
 
 * support for RGB input (via RGB-to-YCbCr pre-conversion upon read)
-* support for SIMD (SSE3) and multithreading during MSE calculation
+* support for SIMD (SSE) and multithreading during visual filtering
 * support for metadata as with FFmpeg's existing PSNR, SSIM filters
 * direct XPSNR integration into FFmpeg codebase if widely requested
 
