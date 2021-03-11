@@ -38,7 +38,7 @@ ___________________________________________________________________
 Copyright
 ---------
 
-© 2019 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© 2019 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 
@@ -101,6 +101,9 @@ source code from its Git repository:
 
 `git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg`
 
+Alternatively, you may download the latest release as a zip archive
+from https://github.com/FFmpeg/FFmpeg/releases and unpack it. Note
+that you may need to rename the upper-level directory to `ffmpeg`.
 Then, you need to copy the files inside the `libavfilter` directory
 of this source distribution into FFmpeg's `libavfilter` directory:
 
@@ -116,9 +119,11 @@ executable with integrated XPSNR support:
 
 `cd ffmpeg`
 
-`./configure`
+`./configure --extra-cflags=-mavx2`
 
 `make`
+
+If the `--extra-cflags=...` option does not work, you may omit it.
 
 
 Usage

@@ -8,7 +8,7 @@ The copyright in this software is being made available under this Software Copyr
 License. This software may be subject to other third-party and contributor rights,
 including patent rights, and no such rights are granted under this license.
 
-Copyright (c) 2019 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+Copyright (c) 2019 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 Redistribution and use of this software in source and binary forms, with or without
@@ -110,6 +110,48 @@ static const AVOption xpsnr_options[] =
 FRAMESYNC_DEFINE_CLASS (xpsnr, XPSNRContext, fs);
 
 /* XPSNR function definitions */
+static uint64_t highds (const int xAct, const int yAct, const int wAct, const int hAct, const int16_t *o, const int O)
+{
+  uint64_t saAct = 0;
+
+  for (int y = yAct; y < hAct; y += 2)
+  {
+    for (int x = xAct; x < wAct; x += 2)
+    {
+      const int f = 12 * ((int)o[ y   *O + x  ] + (int)o[ y   *O + x+1] + (int)o[(y+1)*O + x  ] + (int)o[(y+1)*O + x+1])
+                   - 3 * ((int)o[(y-1)*O + x  ] + (int)o[(y-1)*O + x+1] + (int)o[(y+2)*O + x  ] + (int)o[(y+2)*O + x+1])
+                   - 3 * ((int)o[ y   *O + x-1] + (int)o[ y   *O + x+2] + (int)o[(y+1)*O + x-1] + (int)o[(y+1)*O + x+2])
+                   - 2 * ((int)o[(y-1)*O + x-1] + (int)o[(y-1)*O + x+2] + (int)o[(y+2)*O + x-1] + (int)o[(y+2)*O + x+2])
+                       - ((int)o[(y-2)*O + x-1] + (int)o[(y-2)*O + x  ] + (int)o[(y-2)*O + x+1] + (int)o[(y-2)*O + x+2]
+                        + (int)o[(y+3)*O + x-1] + (int)o[(y+3)*O + x  ] + (int)o[(y+3)*O + x+1] + (int)o[(y+3)*O + x+2]
+                        + (int)o[(y-1)*O + x-2] + (int)o[ y   *O + x-2] + (int)o[(y+1)*O + x-2] + (int)o[(y+2)*O + x-2]
+                        + (int)o[(y-1)*O + x+3] + (int)o[ y   *O + x+3] + (int)o[(y+1)*O + x+3] + (int)o[(y+2)*O + x+3]);
+      saAct += (uint64_t) abs(f);
+    }
+  }
+  return saAct;
+}
+
+static uint64_t diff2nd (const uint32_t wAct, const uint32_t hAct, const int16_t *o, int16_t *oM1, int16_t *oM2, const int O)
+{
+  uint64_t taAct = 0;
+
+  for (uint32_t y = 0; y < hAct; y += 2)
+  {
+    for (uint32_t x = 0; x < wAct; x += 2)
+    {
+      const int t = (int)o  [y*O + x] + (int)o  [y*O + x+1] + (int)o  [(y+1)*O + x] + (int)o  [(y+1)*O + x+1]
+             - 2 * ((int)oM1[y*O + x] + (int)oM1[y*O + x+1] + (int)oM1[(y+1)*O + x] + (int)oM1[(y+1)*O + x+1])
+                  + (int)oM2[y*O + x] + (int)oM2[y*O + x+1] + (int)oM2[(y+1)*O + x] + (int)oM2[(y+1)*O + x+1];
+      taAct += (uint64_t) abs(t);
+      oM2[y*O + x  ] = oM1[y*O + x  ];  oM2[(y+1)*O + x  ] = oM1[(y+1)*O + x  ];
+      oM2[y*O + x+1] = oM1[y*O + x+1];  oM2[(y+1)*O + x+1] = oM1[(y+1)*O + x+1];
+      oM1[y*O + x  ] = o  [y*O + x  ];  oM1[(y+1)*O + x  ] = o  [(y+1)*O + x  ];
+      oM1[y*O + x+1] = o  [y*O + x+1];  oM1[(y+1)*O + x+1] = o  [(y+1)*O + x+1];
+    }
+  }
+  return (taAct * XPSNR_GAMMA);
+}
 
 static uint64_t sseLine16bit (const uint8_t *blkOrg8, const uint8_t *blkRec8, int blockWidth)
 {
@@ -179,21 +221,7 @@ static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
 
   if (bVal > 1) /* highpass with downsampling */
   {
-    for (int y = yAct; y < hAct; y += 2)
-    {
-      for (int x = xAct; x < wAct; x += 2)
-      {
-        const int f = 12 * ((int)o[ y   *O + x  ] + (int)o[ y   *O + x+1] + (int)o[(y+1)*O + x  ] + (int)o[(y+1)*O + x+1])
-                     - 3 * ((int)o[(y-1)*O + x  ] + (int)o[(y-1)*O + x+1] + (int)o[(y+2)*O + x  ] + (int)o[(y+2)*O + x+1])
-                     - 3 * ((int)o[ y   *O + x-1] + (int)o[ y   *O + x+2] + (int)o[(y+1)*O + x-1] + (int)o[(y+1)*O + x+2])
-                     - 2 * ((int)o[(y-1)*O + x-1] + (int)o[(y-1)*O + x+2] + (int)o[(y+2)*O + x-1] + (int)o[(y+2)*O + x+2])
-                         - ((int)o[(y-2)*O + x-1] + (int)o[(y-2)*O + x  ] + (int)o[(y-2)*O + x+1] + (int)o[(y-2)*O + x+2]
-                          + (int)o[(y+3)*O + x-1] + (int)o[(y+3)*O + x  ] + (int)o[(y+3)*O + x+1] + (int)o[(y+3)*O + x+2]
-                          + (int)o[(y-1)*O + x-2] + (int)o[ y   *O + x-2] + (int)o[(y+1)*O + x-2] + (int)o[(y+2)*O + x-2]
-                          + (int)o[(y-1)*O + x+3] + (int)o[ y   *O + x+3] + (int)o[(y+1)*O + x+3] + (int)o[(y+2)*O + x+3]);
-        saAct += (uint64_t) abs(f);
-      }
-    }
+    saAct = s->dsp.highds_func (xAct, yAct, wAct, hAct, o, O);
   }
   else /* <=HD, highpass without downsampling */
   {
@@ -229,20 +257,7 @@ static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
     }
     else  /* 2nd-order diff (diff of 2 diffs) */
     {
-      for (uint32_t y = 0; y < blockHeight; y += 2)
-      {
-        for (uint32_t x = 0; x < blockWidth; x += 2)
-        {
-          const int t = (int)o  [y*O + x] + (int)o  [y*O + x+1] + (int)o  [(y+1)*O + x] + (int)o  [(y+1)*O + x+1]
-                 - 2 * ((int)oM1[y*O + x] + (int)oM1[y*O + x+1] + (int)oM1[(y+1)*O + x] + (int)oM1[(y+1)*O + x+1])
-                      + (int)oM2[y*O + x] + (int)oM2[y*O + x+1] + (int)oM2[(y+1)*O + x] + (int)oM2[(y+1)*O + x+1];
-          taAct += XPSNR_GAMMA * (uint64_t) abs(t);
-          oM2[y*O + x  ] = oM1[y*O + x  ];  oM2[(y+1)*O + x  ] = oM1[(y+1)*O + x  ];
-          oM2[y*O + x+1] = oM1[y*O + x+1];  oM2[(y+1)*O + x+1] = oM1[(y+1)*O + x+1];
-          oM1[y*O + x  ] = o  [y*O + x  ];  oM1[(y+1)*O + x  ] = o  [(y+1)*O + x  ];
-          oM1[y*O + x+1] = o  [y*O + x+1];  oM1[(y+1)*O + x+1] = o  [(y+1)*O + x+1];
-        }
-      }
+      taAct = s->dsp.diff2nd_func (blockWidth, blockHeight, o, oM1, oM2, O);
     }
   }
   else /* <=HD, highpass without downsampling */
@@ -620,6 +635,7 @@ static int config_input_ref (AVFilterLink *inLink)
   const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get (inLink->format);
   AVFilterContext  *ctx = inLink->dst;
   XPSNRContext* const s = ctx->priv;
+  int cpu_flags;
 
   if ((ctx->inputs[0]->w != ctx->inputs[1]->w) ||
       (ctx->inputs[0]->h != ctx->inputs[1]->h))
@@ -663,6 +679,16 @@ static int config_input_ref (AVFilterLink *inLink)
   s->dsp.sse_line = sseLine16bit; /* initialize SIMD routine */
   if (ARCH_X86) ff_psnr_init_x86 (&s->dsp, 15); /* from PSNR */
 
+  s->dsp.highds_func = highds;
+  s->dsp.diff2nd_func = diff2nd;
+  cpu_flags = av_get_cpu_flags();
+  if (EXTERNAL_AVX2 (cpu_flags))
+  {
+#ifdef __AVX2__
+    s->dsp.highds_func = highds_SIMD;
+    s->dsp.diff2nd_func = diff2nd_SIMD;
+#endif
+  }
   return 0;
 }
 

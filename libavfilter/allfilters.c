@@ -172,7 +172,6 @@ extern AVFilter ff_vf_bwdif;
 extern AVFilter ff_vf_cas;
 extern AVFilter ff_vf_chromahold;
 extern AVFilter ff_vf_chromakey;
-extern AVFilter ff_vf_chromanr;
 extern AVFilter ff_vf_chromashift;
 extern AVFilter ff_vf_ciescope;
 extern AVFilter ff_vf_codecview;
