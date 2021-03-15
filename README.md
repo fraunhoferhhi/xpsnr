@@ -101,9 +101,9 @@ more detailed explanation of the steps required to compile FFmpeg.
 First, you need to obtain the latest revision of the *FFmpeg 4.3.x*
 source code from its Git repository:
 
-`git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg`
+`git clone -b release/4.3 https://git.ffmpeg.org/ffmpeg.git ffmpeg`
 
-Alternatively, you may download the latest release as a zip archive
+Alternatively, download the latest 4.3.x release as a zip archive
 from https://github.com/FFmpeg/FFmpeg/releases and unpack it. Note
 that you may need to rename the upper-level directory to `ffmpeg`.
 Then, you need to copy the files inside the `libavfilter` directory
