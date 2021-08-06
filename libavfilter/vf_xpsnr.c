@@ -378,7 +378,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
       for (x = 0; x < W; x += B, idxBlk++)
       {
         const uint32_t blockWidth = (x + B > W ? W - x : B);
-        double msAct = 0.0, msActPrev = 0.0;
+        double msAct = 1.0, msActPrev = 0.0;
 
         sseLuma[idxBlk] = calcSquaredErrorAndWeight(s, pOrg, sOrg,
                                                     pOrgM1, pOrgM2,
@@ -509,7 +509,8 @@ static int do_xpsnr (FFFrameSync *fs)
   {
     for (c = 0; c < s->numComps; c++) /* allocate the org/rec buffer memory */
     {
-      const int O = s->planeWidth[c]; /* stride */
+      const int M = s->lineSizes[c]; /* master stride */
+      const int O = s->planeWidth[c]; /* XPSNR stride */
 
       if (s->bufOrg[c] == NULL) s->bufOrg[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
       if (s->bufRec[c] == NULL) s->bufRec[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
@@ -521,7 +522,7 @@ static int do_xpsnr (FFFrameSync *fs)
       {
         for (int x = 0; x < s->planeWidth[c]; x++)
         {
-          pOrg[c][y*O + x] = (int16_t) master->data[c][y*O + x];
+          pOrg[c][y*O + x] = (int16_t) master->data[c][y*M + x];
           pRec[c][y*O + x] = (int16_t)    ref->data[c][y*O + x];
         }
       }
