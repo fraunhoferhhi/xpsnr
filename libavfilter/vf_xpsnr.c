@@ -341,6 +341,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
   const uint32_t      B = MAX (0, 4 * (int32_t)(32.0 * sqrt (R) + 0.5)); /* block size, integer multiple of 4 for SIMD */
   const uint32_t   WBlk = (W + B - 1) / B; /* luma width in units of blocks */
   const double   avgAct = sqrt (16.0 * (double)(1 << (2 * s->depth - 9)) / sqrt (MAX (0.00001, R))); /* = sqrt (a_pic) */
+  const int*  strideOrg = (s->bpp == 1 ? s->planeWidth : s->lineSizes);
   uint32_t x, y, idxBlk = 0; /* the "16.0" above is due to fixed-point code */
   double* const sseLuma = s->sseLuma;
   double* const weights = s->weights;
@@ -364,7 +365,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
   {
     const bool blockWeightSmoothing = (W * H <= 640u * 480u); /* JITU paper */
     const int16_t *pOrg = org[0];
-    const uint32_t sOrg = s->planeWidth[0];
+    const uint32_t sOrg = strideOrg[0];
     const int16_t *pRec = rec[0];
     const uint32_t sRec = s->planeWidth[0];
     int16_t     *pOrgM1 = orgM1[0]; /* pixel  */
@@ -431,7 +432,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
   for (c = 0; c < s->numComps; c++) /* finalize SSE data for all components */
   {
     const int16_t *pOrg = org[c];
-    const uint32_t sOrg = s->planeWidth[c];
+    const uint32_t sOrg = strideOrg[c];
     const int16_t *pRec = rec[c];
     const uint32_t sRec = s->planeWidth[c];
     const uint32_t WPln = s->planeWidth[c];
@@ -496,13 +497,18 @@ static int do_xpsnr (FFFrameSync *fs)
 
   for (c = 0; c < s->numComps; c++)  /* allocate temporal org buffer memory */
   {
-    if (s->bufOrgM1[c] == NULL) s->bufOrgM1[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
-    if (s->bufOrgM2[c] == NULL) s->bufOrgM2[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
-
-    pOrgM1[c] = (int16_t*) s->bufOrgM1[c]->data;
-    pOrgM2[c] = (int16_t*) s->bufOrgM2[c]->data;
-
     s->lineSizes[c] = master->linesize[c];
+
+    if (c == 0) /* luma ch. */
+    {
+      const int*  strideOrg = (s->bpp == 1 ? s->planeWidth : s->lineSizes);
+
+      if (s->bufOrgM1[c] == NULL) s->bufOrgM1[c] = av_buffer_allocz (strideOrg[c] * s->planeHeight[c] * sizeof (int16_t));
+      if (s->bufOrgM2[c] == NULL) s->bufOrgM2[c] = av_buffer_allocz (strideOrg[c] * s->planeHeight[c] * sizeof (int16_t));
+
+      pOrgM1[c] = (int16_t*) s->bufOrgM1[c]->data;
+      pOrgM2[c] = (int16_t*) s->bufOrgM2[c]->data;
+    }
   }
 
   if (s->bpp == 1) /* 8 bit */
