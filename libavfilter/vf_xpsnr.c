@@ -365,7 +365,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
   {
     const bool blockWeightSmoothing = (W * H <= 640u * 480u); /* JITU paper */
     const int16_t *pOrg = org[0];
-    const uint32_t sOrg = strideOrg[0];
+    const uint32_t sOrg = strideOrg[0] / s->bpp;
     const int16_t *pRec = rec[0];
     const uint32_t sRec = s->planeWidth[0];
     int16_t     *pOrgM1 = orgM1[0]; /* pixel  */
@@ -432,7 +432,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
   for (c = 0; c < s->numComps; c++) /* finalize SSE data for all components */
   {
     const int16_t *pOrg = org[c];
-    const uint32_t sOrg = strideOrg[c];
+    const uint32_t sOrg = strideOrg[c] / s->bpp;
     const int16_t *pRec = rec[c];
     const uint32_t sRec = s->planeWidth[c];
     const uint32_t WPln = s->planeWidth[c];
@@ -501,10 +501,10 @@ static int do_xpsnr (FFFrameSync *fs)
 
     if (c == 0) /* luma ch. */
     {
-      const int*  strideOrg = (s->bpp == 1 ? s->planeWidth : s->lineSizes);
+      const int strideOrgBpp = (s->bpp == 1 ? s->planeWidth[c] : s->lineSizes[c] / s->bpp);
 
-      if (s->bufOrgM1[c] == NULL) s->bufOrgM1[c] = av_buffer_allocz (strideOrg[c] * s->planeHeight[c] * sizeof (int16_t));
-      if (s->bufOrgM2[c] == NULL) s->bufOrgM2[c] = av_buffer_allocz (strideOrg[c] * s->planeHeight[c] * sizeof (int16_t));
+      if (s->bufOrgM1[c] == NULL) s->bufOrgM1[c] = av_buffer_allocz (strideOrgBpp * s->planeHeight[c] * sizeof (int16_t));
+      if (s->bufOrgM2[c] == NULL) s->bufOrgM2[c] = av_buffer_allocz (strideOrgBpp * s->planeHeight[c] * sizeof (int16_t));
 
       pOrgM1[c] = (int16_t*) s->bufOrgM1[c]->data;
       pOrgM2[c] = (int16_t*) s->bufOrgM2[c]->data;
