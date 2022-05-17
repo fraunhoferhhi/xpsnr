@@ -8,7 +8,7 @@ The copyright in this software is being made available under this Software Copyr
 License. This software may be subject to other third-party and contributor rights,
 including patent rights, and no such rights are granted under this license.
 
-Copyright (c) 2019 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+Copyright (c) 2019 - 2021 Fraunhofer-Gesellschaft zur Fï¿½rderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 Redistribution and use of this software in source and binary forms, with or without
@@ -210,6 +210,12 @@ static inline uint64_t calcSquaredError(XPSNRContext const *s,
   return uSSE;
 }
 
+/* R&N: 
+* picOrg is the original picture
+* picRec is the reconstructed picture
+* picOrgM1 is the previus frame of the original picture 
+* picOrgM2 is the 2 frames before the original picture
+ */
 static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
                                                 const int16_t *picOrg,     const uint32_t strideOrg,
                                                 int16_t       *picOrgM1,   int16_t       *picOrgM2,
@@ -218,34 +224,34 @@ static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
                                                 const uint32_t blockWidth, const uint32_t blockHeight,
                                                 const uint32_t bitDepth,   const uint32_t intFrameRate, double *msAct)
 {
-  const int      O = (int) strideOrg;
+  const int      O = (int) strideOrg; 
   const int      R = (int) strideRec;
   const int16_t *o = picOrg   + offsetY*O + offsetX;
   int16_t     *oM1 = picOrgM1 + offsetY*O + offsetX;
   int16_t     *oM2 = picOrgM2 + offsetY*O + offsetX;
   const int16_t *r = picRec   + offsetY*R + offsetX;
   const int   bVal = (s->planeWidth[0] * s->planeHeight[0] > 2048 * 1152 ? 2 : 1); /* threshold is a bit more than HD resolution */
-  const int   xAct = (offsetX > 0 ? 0 : bVal);
-  const int   yAct = (offsetY > 0 ? 0 : bVal);
+  const int   xAct = (offsetX > 0 ? 0 : bVal); /* R&N: The index to iterate of the block, X, the adjacents. edge case if offSet = 0 */
+  const int   yAct = (offsetY > 0 ? 0 : bVal);  /* R&N: The index to iterate of the block, Y, the adjacents. edge case if offSet = 0 */
   const int   wAct = (offsetX + blockWidth  < (uint32_t) s->planeWidth [0] ? (int) blockWidth  : (int) blockWidth  - bVal);
   const int   hAct = (offsetY + blockHeight < (uint32_t) s->planeHeight[0] ? (int) blockHeight : (int) blockHeight - bVal);
 
   const double sse = (double) calcSquaredError (s, o, strideOrg,
                                                 r, strideRec,
-                                                blockWidth, blockHeight);
-  uint64_t saAct = 0;  /* spatial abs. activity */
-  uint64_t taAct = 0; /* temporal abs. activity */
+                                                blockWidth, blockHeight); /* R&N: sum squard errors between 2 block, original and reconstructed */
+  uint64_t saAct = 0;  /* spatial abs. activity */ /* R&N: sum of all the Hs (convolution) from the paper */
+  uint64_t taAct = 0; /* temporal abs. activity */ /*R&N: sum of all the Ht from the paper: the distance between following frames */
 
   if (wAct <= xAct || hAct <= yAct) /* too tiny */
   {
     return sse;
   }
 
-  if (bVal > 1) /* highpass with downsampling */
+  if (bVal > 1) /* highpass with downsampling */ /* R&N: HD case */
   {
     saAct = s->dsp.highds_func (xAct, yAct, wAct, hAct, o, O);
   }
-  else /* <=HD, highpass without downsampling */
+  else /* <=HD, highpass without downsampling */ /* R&N: Not-HD case */
   {
     for (int y = yAct; y < hAct; y++)
     {
@@ -261,20 +267,20 @@ static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
   /* calculate weight (mean squared activity) */
   *msAct = (double) saAct / ((double)(wAct - xAct) * (double)(hAct - yAct));
 
-  if (bVal > 1) /* highpass with downsampling */
+  if (bVal > 1) /* highpass with downsampling */ /* R&N: HD case */
   {
-    if (intFrameRate <= 32) /* 1st-order diff */
+    if (intFrameRate <= 32) /* 1st-order diff */ /* R&N: frame rate <= 32: only 1 frame before */
     {
       taAct = s->dsp.diff1st_func (blockWidth, blockHeight, o, oM1, O);
     }
-    else  /* 2nd-order diff (diff of 2 diffs) */
+    else  /* 2nd-order diff (diff of 2 diffs) */ /* R&N: frame rate > 32: 2 frames before */
     {
       taAct = s->dsp.diff2nd_func (blockWidth, blockHeight, o, oM1, oM2, O);
     }
   }
-  else /* <=HD, highpass without downsampling */
+  else /* <=HD, highpass without downsampling */ /* R&N: not HD case*/
   {
-    if (intFrameRate <= 32) /* 1st-order diff */
+    if (intFrameRate <= 32) /* 1st-order diff */  /* R&N: frame rate <= 32: only 1 frame before */
     {
       for (uint32_t y = 0; y < blockHeight; y++)
       {
@@ -283,11 +289,11 @@ static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
           const int t = (int)o[y*O + x] - (int)oM1[y*O + x];
 
           taAct += XPSNR_GAMMA * (uint64_t) abs(t);
-          oM1[y*O + x] = o  [y*O + x];
+          oM1[y*O + x] = o  [y*O + x]; /* R&N: saves the current frame in the last frame - oM1 for next iteration*/
         }
       }
     }
-    else  /* 2nd-order diff (diff of 2 diffs) */
+    else  /* 2nd-order diff (diff of 2 diffs) */  /* R&N: frame rate > 32: 2 frames before */
     {
       for (uint32_t y = 0; y < blockHeight; y++)
       {
@@ -309,12 +315,15 @@ static inline double calcSquaredErrorAndWeight (XPSNRContext const *s,
   /* lower limit, accounts for high-pass gain */
   if (*msAct < (double)(1 << (bitDepth - 6))) *msAct = (double)(1 << (bitDepth - 6));
 
-  *msAct *= *msAct; /* because SSE is squared */
+  *msAct *= *msAct; /* because SSE is squared */ /* R&N: alpha k*/
 
   /* return nonweighted sum of squared errors */
   return sse;
 }
 
+/*
+* 
+*/
 static inline double getAvgXPSNR (const double sqrtWSSEData, const double sumXPSNRData,
                                   const uint32_t imageWidth, const uint32_t imageHeight,
                                   const uint64_t maxError64, const uint64_t numFrames64)
@@ -326,7 +335,7 @@ static inline double getAvgXPSNR (const double sqrtWSSEData, const double sumXPS
     const double meanDist = sqrtWSSEData / (double) numFrames64;
     const uint64_t  num64 = (uint64_t) imageWidth * (uint64_t) imageHeight * maxError64;
 
-    return 10.0 * log10 ((double) num64 / ((double) meanDist * (double) meanDist));
+    return 10.0 * log10 ((double) num64 / ((double) meanDist * (double) meanDist)); /* R&N: this is the XPSNR value */
   }
 
   return sumXPSNRData / (double) numFrames64; /* older log-domain averaging */
@@ -386,10 +395,10 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
                                                     pRec, sRec,
                                                     x, y,
                                                     blockWidth, blockHeight,
-                                                    s->depth, s->frameRate, &msAct);
-        weights[idxBlk] = 1.0 / sqrt (msAct);
+                                                    s->depth, s->frameRate, &msAct); /* R&N: SSE of the idxBlk */
+        weights[idxBlk] = 1.0 / sqrt (msAct); // R&N: weight of the idxBlk
 
-        if (blockWeightSmoothing) /* inline "minimum-smoothing" as in paper */
+        if (blockWeightSmoothing) /* inline "minimum-smoothing" as in paper */ /* R&N : no mention to "minimum-smoothing" in our paper */
         {
           if (x == 0) /* first column */
           {
@@ -423,7 +432,7 @@ static int getWSSE (AVFilterContext *ctx, int16_t **org, int16_t **orgM1, int16_
     {
       for (x = 0; x < W; x += B, idxBlk++)
       {
-        wsseLuma += sseLuma[idxBlk] * weights[idxBlk];
+        wsseLuma += sseLuma[idxBlk] * weights[idxBlk]; /* wsseLuma - is the sum of all the SSEs multiplied by the weights* */
       }
     }
     wsse64[0] = (wsseLuma <= 0.0 ? 0 : (uint64_t)(wsseLuma * avgAct + 0.5));
@@ -549,7 +558,7 @@ static int do_xpsnr (FFFrameSync *fs)
   {
     return retValue; /* an error here implies something went wrong earlier! */
   }
-
+  /* R&N: the calculation of the getWSSE is saved in wsse64 - wsse64[0] is the luma calculation*/
   for (c = 0; c < s->numComps; c++)
   {
     const double sqrtWSSE = sqrt ((double) wsse64[c]);
@@ -558,7 +567,7 @@ static int do_xpsnr (FFFrameSync *fs)
                                s->planeWidth[c], s->planeHeight[c],
                                s->maxError64, 1 /* single frame */);
     s->sumWDist[c] += sqrtWSSE;
-    s->sumXPSNR[c] += curXPSNR[c];
+    s->sumXPSNR[c] += curXPSNR[c]; /* R&N : saves into sumXPSNR the XPSNR of current frame - fs */
     s->andIsInf[c] &= isinf (curXPSNR[c]);
   }
   s->numFrames64++;
@@ -749,7 +758,7 @@ static av_cold void uninit (AVFilterContext *ctx)
   {
     const double xpsnrLuma = getAvgXPSNR (s->sumWDist[0], s->sumXPSNR[0],
                                           s->planeWidth[0], s->planeHeight[0],
-                                          s->maxError64, s->numFrames64);
+                                          s->maxError64, s->numFrames64); /* R&N: the average xpsnr of all frames*/
     double xpsnrMin = xpsnrLuma;
 
     /* luma */
