@@ -8,7 +8,7 @@ The copyright in this software is being made available under this Software Copyr
 License. This software may be subject to other third-party and contributor rights,
 including patent rights, and no such rights are granted under this license.
 
-Copyright (c) 2019 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+Copyright (c) 2019 - 2024 Fraunhofer-Gesellschaft zur FÃ¶rderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 Redistribution and use of this software in source and binary forms, with or without
@@ -50,6 +50,7 @@ INFRINGEMENT WITH RESPECT TO THIS SOFTWARE.
 
 #include <stdbool.h>
 #include "libavutil/avstring.h"
+#include "libavutil/mem.h"
 #include "libavutil/opt.h"
 #include "libavutil/pixdesc.h"
 #include "avfilter.h"
@@ -492,8 +493,8 @@ static int do_xpsnr (FFFrameSync *fs)
   if (ref == NULL) return ff_filter_frame (ctx->outputs[0], master);
 
   /* prepare XPSNR calculation: allocate temporary picture and block memory */
-  if (s->sseLuma == NULL) s->sseLuma = (double*) av_mallocz_array (WBlk * HBlk, sizeof (double));
-  if (s->weights == NULL) s->weights = (double*) av_mallocz_array (WBlk * HBlk, sizeof (double));
+  if (s->sseLuma == NULL) s->sseLuma = (double*) av_malloc_array (WBlk * HBlk, sizeof (double));
+  if (s->weights == NULL) s->weights = (double*) av_malloc_array (WBlk * HBlk, sizeof (double));
 
   for (c = 0; c < s->numComps; c++)  /* allocate temporal org buffer memory */
   {
@@ -516,6 +517,7 @@ static int do_xpsnr (FFFrameSync *fs)
     for (c = 0; c < s->numComps; c++) /* allocate the org/rec buffer memory */
     {
       const int M = s->lineSizes[c]; /* master stride */
+      const int R = ref->linesize[c]; /* ref/c stride */
       const int O = s->planeWidth[c]; /* XPSNR stride */
 
       if (s->bufOrg[c] == NULL) s->bufOrg[c] = av_buffer_allocz (s->planeWidth[c] * s->planeHeight[c] * sizeof (int16_t));
@@ -529,7 +531,7 @@ static int do_xpsnr (FFFrameSync *fs)
         for (int x = 0; x < s->planeWidth[c]; x++)
         {
           pOrg[c][y*O + x] = (int16_t) master->data[c][y*M + x];
-          pRec[c][y*O + x] = (int16_t)    ref->data[c][y*O + x];
+          pRec[c][y*O + x] = (int16_t)    ref->data[c][y*R + x];
         }
       }
     }
@@ -624,30 +626,21 @@ static av_cold int init (AVFilterContext *ctx)
   return 0;
 }
 
-static int query_formats (AVFilterContext *ctx)
+static const enum AVPixelFormat xpsnr_formats[] =
 {
-  static const enum AVPixelFormat pix_fmts[] =
-  {
-    AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY9, AV_PIX_FMT_GRAY10, AV_PIX_FMT_GRAY12, AV_PIX_FMT_GRAY14, AV_PIX_FMT_GRAY16,
+  AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY9, AV_PIX_FMT_GRAY10, AV_PIX_FMT_GRAY12, AV_PIX_FMT_GRAY14, AV_PIX_FMT_GRAY16,
 #define PF_NOALPHA(suf) AV_PIX_FMT_YUV420##suf,  AV_PIX_FMT_YUV422##suf,  AV_PIX_FMT_YUV444##suf
 #define PF_ALPHA(suf)   AV_PIX_FMT_YUVA420##suf, AV_PIX_FMT_YUVA422##suf, AV_PIX_FMT_YUVA444##suf
 #define PF(suf)         PF_NOALPHA(suf), PF_ALPHA(suf)
-    PF(P), PF(P9), PF(P10), PF_NOALPHA(P12), PF_NOALPHA(P14), PF(P16),
-    AV_PIX_FMT_YUV440P, AV_PIX_FMT_YUV411P, AV_PIX_FMT_YUV410P,
-    AV_PIX_FMT_YUVJ411P, AV_PIX_FMT_YUVJ420P, AV_PIX_FMT_YUVJ422P,
-    AV_PIX_FMT_YUVJ440P, AV_PIX_FMT_YUVJ444P,
-    AV_PIX_FMT_GBRP, AV_PIX_FMT_GBRP9, AV_PIX_FMT_GBRP10,
-    AV_PIX_FMT_GBRP12, AV_PIX_FMT_GBRP14, AV_PIX_FMT_GBRP16,
-    AV_PIX_FMT_GBRAP, AV_PIX_FMT_GBRAP10, AV_PIX_FMT_GBRAP12, AV_PIX_FMT_GBRAP16,
-    AV_PIX_FMT_NONE
-  };
-
-  AVFilterFormats *fmts_list = ff_make_format_list (pix_fmts);
-
-  if (fmts_list == NULL) return AVERROR (ENOMEM);
-
-  return ff_set_common_formats (ctx, fmts_list);
-}
+  PF(P), PF(P9), PF(P10), PF_NOALPHA(P12), PF_NOALPHA(P14), PF(P16),
+  AV_PIX_FMT_YUV440P, AV_PIX_FMT_YUV411P, AV_PIX_FMT_YUV410P,
+  AV_PIX_FMT_YUVJ411P, AV_PIX_FMT_YUVJ420P, AV_PIX_FMT_YUVJ422P,
+  AV_PIX_FMT_YUVJ440P, AV_PIX_FMT_YUVJ444P,
+  AV_PIX_FMT_GBRP, AV_PIX_FMT_GBRP9, AV_PIX_FMT_GBRP10,
+  AV_PIX_FMT_GBRP12, AV_PIX_FMT_GBRP14, AV_PIX_FMT_GBRP16,
+  AV_PIX_FMT_GBRAP, AV_PIX_FMT_GBRAP10, AV_PIX_FMT_GBRAP12, AV_PIX_FMT_GBRAP16,
+  AV_PIX_FMT_NONE
+};
 
 static int config_input_ref (AVFilterLink *inLink)
 {
@@ -816,8 +809,7 @@ static const AVFilterPad xpsnr_inputs[] =
     .name         = "reference",
     .type         = AVMEDIA_TYPE_VIDEO,
     .config_props = config_input_ref,
-  },
-  { NULL }
+  }
 };
 
 static const AVFilterPad xpsnr_outputs[] =
@@ -826,8 +818,7 @@ static const AVFilterPad xpsnr_outputs[] =
     .name         = "default",
     .type         = AVMEDIA_TYPE_VIDEO,
     .config_props = config_output,
-  },
-  { NULL }
+  }
 };
 
 AVFilter ff_vf_xpsnr =
@@ -837,10 +828,13 @@ AVFilter ff_vf_xpsnr =
   .preinit        = xpsnr_framesync_preinit,
   .init           = init,
   .uninit         = uninit,
-  .query_formats  = query_formats,
   .activate       = activate,
   .priv_size      = sizeof (XPSNRContext),
   .priv_class     = &xpsnr_class,
-  .inputs         = xpsnr_inputs,
-  .outputs        = xpsnr_outputs,
+  FILTER_INPUTS(xpsnr_inputs),
+  FILTER_OUTPUTS(xpsnr_outputs),
+  FILTER_PIXFMTS_ARRAY(xpsnr_formats),
+  .flags          = AVFILTER_FLAG_SUPPORT_TIMELINE_INTERNAL |
+                    AVFILTER_FLAG_SLICE_THREADS             |
+                    AVFILTER_FLAG_METADATA_ONLY
 };

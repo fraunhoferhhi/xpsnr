@@ -8,7 +8,7 @@ The copyright in this software is being made available under this Software Copyr
 License. This software may be subject to other third-party and contributor rights,
 including patent rights, and no such rights are granted under this license.
 
-Copyright (c) 2019 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+Copyright (c) 2019 - 2024 Fraunhofer-Gesellschaft zur FÃ¶rderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 Redistribution and use of this software in source and binary forms, with or without
