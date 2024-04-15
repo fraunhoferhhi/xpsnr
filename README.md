@@ -12,15 +12,15 @@ reflect human impressions of visual coding quality. More details on
 the XPSNR method can be found in the following scientific papers:
 
 *   C. R. Helmrich, M. Siekmann, S. Becker, S. Bosse, D. Marpe, and
- T. Wiegand, “XPSNR: A Low-Complexity Extension of the Perceptually
+ T. Wiegand, ï¿½XPSNR: A Low-Complexity Extension of the Perceptually
  Weighted Peak Signal-to-Noise Ratio for High-Resolution Video Qua-
- lity Assessment,” in Proc. IEEE Int. Conf. Acoustics, Speech, Sig.
+ lity Assessment,ï¿½ in Proc. IEEE Int. Conf. Acoustics, Speech, Sig.
  Process. (ICASSP), virt./online, May 2020. www.ecodis.de/xpsnr.htm
 
 *   C. R. Helmrich, S. Bosse, H. Schwarz, D. Marpe, and T. Wiegand,
-“A Study of the Extended Perceptually Weighted Peak Signal-to-Noise
+ï¿½A Study of the Extended Perceptually Weighted Peak Signal-to-Noise
  Ratio (XPSNR) for Video Compression with Different Resolutions and
- Bit Depths,” ITU Journal: ICT Discoveries, vol. 3, no. 1, pp. 65 -
+ Bit Depths,ï¿½ ITU Journal: ICT Discoveries, vol. 3, no. 1, pp. 65 -
  72, May 2020. http://handle.itu.int/11.1002/pub/8153d78b-en
 
 This software allows to determine XPSNR output values, per-frame or
@@ -38,7 +38,7 @@ ___________________________________________________________________
 Copyright
 ---------
 
-© 2019 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+ï¿½ 2019 - 2024 Fraunhofer-Gesellschaft zur Fï¿½rderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 
@@ -68,7 +68,7 @@ commercial purposes provided that the following conditions are met:
   from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
-“AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ï¿½AS ISï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
 FOR A PARTICULAR PURPOSE, ARE DISCLAIMED. IN NO EVENT SHALL THE
 COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -98,13 +98,13 @@ under Linux. Instructions for Microsoft Windows may be added later.
 Please also see https://trac.ffmpeg.org/wiki/CompilationGuide for a
 more detailed explanation of the steps required to compile FFmpeg.
 
-First, you need to obtain the latest revision of the *FFmpeg 4.4.x*
+First, you need to obtain the latest revision of the *FFmpeg 7.0.x*
 source code from its Git repository:
 
-`git clone -b release/4.4 https://git.ffmpeg.org/ffmpeg.git ffmpeg`
+`git clone -b release/7.0 https://git.ffmpeg.org/ffmpeg.git ffmpeg`
 
-Alternatively, download the latest 4.4.x release as a zip archive
-from https://github.com/FFmpeg/FFmpeg/releases and unpack it. Note
+Alternatively, download the latest 7.0.x release as a zip archive
+from https://github.com/FFmpeg/FFmpeg/tags and unpack the zip. Note
 that you may need to rename the upper-level directory to `ffmpeg`.
 Then, you need to copy the files inside the `libavfilter` directory
 of this source distribution into FFmpeg's `libavfilter` directory:
@@ -133,7 +133,7 @@ Usage
 
 This section describes how to calculate XPSNR output values between
 two video streams using a compiled FFmpeg executable which includes
-this plug-in (see the “Compilation” section above). Since the XPSNR
+this plug-in (see the ï¿½Compilationï¿½ section above). Since the XPSNR
 filter works similarly to FFmpeg's existing PSNR filter, it is also
 worth taking a look at https://trac.ffmpeg.org/wiki/FilteringGuide,
 or http://ffmpeg.org/ffmpeg-filters.html#psnr specifically.
@@ -216,5 +216,5 @@ Fraunhofer Heinrich Hertz Institute (HHI),
 Video Coding & Analytics (VCA) Department,
 Einsteinufer 37, 10587 Berlin, Germany.
 
-For detailed contact information please see “People and Contact” at
+For detailed contact information please see ï¿½People and Contactï¿½ at
 https://www.hhi.fraunhofer.de/en/departments/vca.html
