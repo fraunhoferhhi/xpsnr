@@ -12,15 +12,15 @@ reflect human impressions of visual coding quality. More details on
 the XPSNR method can be found in the following scientific papers:
 
 *   C. R. Helmrich, M. Siekmann, S. Becker, S. Bosse, D. Marpe, and
- T. Wiegand, �XPSNR: A Low-Complexity Extension of the Perceptually
+ T. Wiegand, "XPSNR: A Low-Complexity Extension of the Perceptually
  Weighted Peak Signal-to-Noise Ratio for High-Resolution Video Qua-
- lity Assessment,� in Proc. IEEE Int. Conf. Acoustics, Speech, Sig.
+ lity Assessment," in Proc. IEEE Int. Conf. Acoustics, Speech, Sig.
  Process. (ICASSP), virt./online, May 2020. www.ecodis.de/xpsnr.htm
 
 *   C. R. Helmrich, S. Bosse, H. Schwarz, D. Marpe, and T. Wiegand,
-�A Study of the Extended Perceptually Weighted Peak Signal-to-Noise
+"A Study of the Extended Perceptually Weighted Peak Signal-to-Noise
  Ratio (XPSNR) for Video Compression with Different Resolutions and
- Bit Depths,� ITU Journal: ICT Discoveries, vol. 3, no. 1, pp. 65 -
+ Bit Depths," ITU Journal: ICT Discoveries, vol. 3, no. 1, pp. 65 -
  72, May 2020. http://handle.itu.int/11.1002/pub/8153d78b-en
 
 This software allows to determine XPSNR output values, per-frame or
@@ -38,7 +38,7 @@ ___________________________________________________________________
 Copyright
 ---------
 
-� 2019 - 2024 Fraunhofer-Gesellschaft zur F�rderung der angewandten
+© 2019 - 2024 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. (Fraunhofer). All rights reserved.
 
 
@@ -68,7 +68,7 @@ commercial purposes provided that the following conditions are met:
   from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
-�AS IS� AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
 FOR A PARTICULAR PURPOSE, ARE DISCLAIMED. IN NO EVENT SHALL THE
 COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -133,7 +133,7 @@ Usage
 
 This section describes how to calculate XPSNR output values between
 two video streams using a compiled FFmpeg executable which includes
-this plug-in (see the �Compilation� section above). Since the XPSNR
+this plug-in (see the "Compilation" section above). Since the XPSNR
 filter works similarly to FFmpeg's existing PSNR filter, it is also
 worth taking a look at https://trac.ffmpeg.org/wiki/FilteringGuide,
 or http://ffmpeg.org/ffmpeg-filters.html#psnr specifically.
@@ -202,9 +202,7 @@ Pull requests with bugfixes and/or speedups are highly appreciated.
 The following functionality is planned to be integrated in a future
 revision of this XPSNR implementation. Support is kindly requested.
 
-* support for RGB input (via RGB-to-YCbCr pre-conversion upon read)
 * support for multithreading during visual filtering for more speed
-* support for metadata as with FFmpeg's existing PSNR, SSIM filters
 * direct XPSNR integration into FFmpeg codebase if widely requested
 
 
@@ -213,8 +211,8 @@ Contact Information
 
 Christian Helmrich and Christian Stoffers,
 Fraunhofer Heinrich Hertz Institute (HHI),
-Video Coding & Analytics (VCA) Department,
+Video Communication and Applications Dept,
 Einsteinufer 37, 10587 Berlin, Germany.
 
-For detailed contact information please see �People and Contact� at
+For detailed contact information please see "People and Contact" at
 https://www.hhi.fraunhofer.de/en/departments/vca.html
