@@ -1,6 +1,12 @@
 XPSNR Filter Plug-in for FFmpeg
 ===============================
 
+**NOTE: A cleaned version of this plug-in is now directly available
+in the FFmpeg codebase.  For details see e.g. the Git repository at
+https://github.com/FFmpeg/FFmpeg/tree/master/ and the FFmpeg filter
+documentation at https://ffmpeg.org/ffmpeg-filters.html#xpsnr-1.
+This repository is only kept for reference and is not maintained!**
+
 The Extended Perceptually Weighted Peak Signal-to-Noise Ratio XPSNR
 is a low-complexity psychovisually motivated distortion measurement
 algorithm for assessing the difference between two video streams or
